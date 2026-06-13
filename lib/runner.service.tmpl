@@ -1,0 +1,14 @@
+[Unit]
+Description=GitHub Actions self-hosted runner (@RDIR@)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@RDIR@
+ExecStart=@RDIR@/run.sh
+Restart=always
+RestartSec=5
+KillMode=process
+
+[Install]
+WantedBy=default.target

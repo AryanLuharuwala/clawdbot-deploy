@@ -1,0 +1,7 @@
+# Plaintext secrets staging — NEVER commit. Only the encrypted *.tar.enc are committed.
+secrets/plain/
+*.env
+*.env.local
+*.pem
+# allow the encrypted bundles
+!secrets/*.tar.enc

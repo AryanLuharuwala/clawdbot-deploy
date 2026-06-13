@@ -1,0 +1,12 @@
+[Unit]
+Description=cloudflared named tunnel (madhur) -> bitforbytes.in
+After=network-online.target verilog-frontend.service
+
+[Service]
+Type=simple
+ExecStart=@BIN@/cloudflared tunnel --no-autoupdate run madhur
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

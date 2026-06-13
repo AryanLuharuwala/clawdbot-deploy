@@ -1,0 +1,13 @@
+[Unit]
+Description=cloudflared connector (pollys tunnel) -> pollys.food
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=@HOME@/.cloudflared/pollys.env
+ExecStart=@BIN@/cloudflared tunnel --no-autoupdate run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=MongoDB (local) for pollys
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=@BIN@/mongod --dbpath @HOME@/mongodb-data --bind_ip 127.0.0.1 --port @PORT@ --logpath @HOME@/mongodb-logs/mongod.log --logappend
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

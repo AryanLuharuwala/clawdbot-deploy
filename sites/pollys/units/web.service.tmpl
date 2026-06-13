@@ -1,0 +1,17 @@
+[Unit]
+Description=Pollys (Dosa-Inn) Next.js web :@PORT@
+After=network-online.target mongod.service
+Wants=mongod.service
+
+[Service]
+Type=simple
+WorkingDirectory=@HOME@/dosa-src
+Environment=NODE_ENV=production
+Environment=PORT=@PORT@
+Environment=PATH=@BIN@:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env npm run start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
