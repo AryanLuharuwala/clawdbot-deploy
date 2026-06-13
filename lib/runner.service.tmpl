@@ -8,7 +8,9 @@ WorkingDirectory=@RDIR@
 ExecStart=@RDIR@/run.sh
 Restart=always
 RestartSec=5
-KillMode=process
+# default KillMode=control-group: stop kills run.sh AND its Runner.Listener child,
+# so no orphaned process keeps holding the GitHub runner session.
+TimeoutStopSec=30
 
 [Install]
 WantedBy=default.target

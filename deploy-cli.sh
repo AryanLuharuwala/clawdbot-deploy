@@ -9,7 +9,8 @@
 #   ./deploy-cli.sh start|stop|restart|logs <site>
 #   ./deploy-cli.sh deploy <site>            # rebuild from latest git (what the runner runs)
 #   ./deploy-cli.sh secrets gather|seal|unseal <site>
-#   ./deploy-cli.sh register-runner <site>
+#   ./deploy-cli.sh register-runner <site>           # set up push-to-deploy runner
+#   ./deploy-cli.sh runner start|stop|restart|status|logs <site>
 #   ./deploy-cli.sh add-site <name>
 #
 # Env knobs: GH_TOKEN (clone private repos + register runners),
@@ -24,15 +25,23 @@ site_services() {  # echo "unit port tmpl" lines
   local s; for s in "${SERVICES[@]}"; do echo "${s//:/ }"; done
 }
 
+runner_unit() { [ -n "${RUNNER_LABEL:-}" ] && echo "runner-$SITE_NAME"; }
+runner_state() {  # one-word state for the site's runner unit, or "-"
+  local ru; ru="$(runner_unit)"; [ -n "$ru" ] || { echo "-"; return; }
+  uctl is-active "$ru" 2>/dev/null || echo "down"
+}
+
 cmd_list() {
-  printf '%-14s %-8s %-22s %s\n' SITE STATUS TUNNEL SERVICES
+  printf '%-14s %-8s %-9s %-20s %s\n' SITE STATUS RUNNER TUNNEL SERVICES
   local name
   for name in $(list_sites); do
     ( load_site "$name"
       local up=0 tot=0 u
       for u in $(site_services | awk '{print $1}'); do tot=$((tot+1)); uctl is-active --quiet "$u" && up=$((up+1)); done
-      local st="$c_dim-$c_off"; [ "$up" -gt 0 ] && st="$c_grn$up/$tot up$c_off"; [ "$up" = 0 ] && st="$c_dim$up/$tot$c_off"
-      printf '%-14s %-17s %-22s %s\n' "$name" "$st" "${TUNNEL_HOSTNAME:-none}" "$(site_services | awk '{print $1}' | paste -sd, -)"
+      local st="$c_dim$up/$tot$c_off"; [ "$up" -gt 0 ] && st="$c_grn$up/$tot up$c_off"
+      local rs; rs="$(runner_state)"
+      case "$rs" in active) rs="${c_grn}on${c_off}";; -) rs="$c_dim-$c_off";; *) rs="${c_ylw}$rs${c_off}";; esac
+      printf '%-14s %-17s %-18s %-20s %s\n' "$name" "$st" "$rs" "${TUNNEL_HOSTNAME:-none}" "$(site_services | awk '{print $1}' | paste -sd, -)"
     )
   done
 }
@@ -44,6 +53,7 @@ cmd_status() {
   local u p; while read -r u p _; do
     printf '   %-26s %s\n' "$u" "$(uctl is-active "$u" 2>/dev/null)"
   done < <(site_services)
+  local ru; ru="$(runner_unit)"; [ -n "$ru" ] && printf '   %-26s %s\n' "$ru (auto-deploy)" "$(uctl is-active "$ru" 2>/dev/null)"
 }
 
 cmd_install() {
@@ -89,7 +99,7 @@ cmd_install() {
 
 cmd_deploy() { local name="$1"; load_site "$name"; bash "$SITE_DIR/deploy.sh"; }
 
-cmd_svc() {  # start/stop/restart/logs
+cmd_svc() {  # start/stop/restart/logs — app services (runner is managed separately)
   local action="$1" name="$2"; load_site "$name"
   local u; for u in $(site_services | awk '{print $1}'); do
     case "$action" in
@@ -97,6 +107,20 @@ cmd_svc() {  # start/stop/restart/logs
       *) uctl "$action" "$u" && ok "$action $u";;
     esac
   done
+  # show the runner under logs, but never auto-stop/restart it (could kill a live deploy job)
+  local ru; ru="$(runner_unit)"
+  [ -n "$ru" ] && [ "$action" = logs ] && { echo "── $ru ──"; uctl --no-pager -n 8 status "$ru" 2>/dev/null | tail -9; }
+}
+
+cmd_runner() {  # explicit runner control: runner start|stop|restart|status|logs <site>
+  local action="$1" name="$2"; load_site "$name"
+  local ru; ru="$(runner_unit)"; [ -n "$ru" ] || die "$name has no runner (RUNNER_LABEL unset)"
+  case "$action" in
+    status) uctl --no-pager status "$ru" 2>/dev/null | grep -iE "Active:|Listening for Jobs|Running job" | tail -3;;
+    logs)   journalctl --user -u "$ru" --no-pager -n 30;;
+    start|stop|restart) uctl "$action" "$ru" && ok "$action $ru";;
+    *) die "runner: start|stop|restart|status|logs <site>";;
+  esac
 }
 
 cmd_register_runner() {
@@ -153,6 +177,7 @@ main() {
     deploy)           [ $# -ge 1 ] || die "usage: deploy <site>"; cmd_deploy "$@";;
     start|stop|restart|logs) [ $# -ge 1 ] || die "usage: $cmd <site>"; cmd_svc "$cmd" "$@";;
     register-runner)  [ $# -ge 1 ] || die "usage: register-runner <site>"; cmd_register_runner "$@";;
+    runner)           [ $# -ge 2 ] || die "usage: runner start|stop|restart|status|logs <site>"; cmd_runner "$@";;
     secrets)          [ $# -ge 1 ] || die "usage: secrets gather|seal|unseal <site>"; cmd_secrets "$@";;
     add-site)         [ $# -ge 1 ] || die "usage: add-site <name>"; cmd_add_site "$@";;
     -h|--help|help)   sed -n '2,20p' "$0";;

@@ -37,9 +37,25 @@ push-to-deploy runners. ~3 minutes.
 ./deploy-cli.sh list                 # sites + how many services are up
 ./deploy-cli.sh status pollys        # per-service state
 ./deploy-cli.sh deploy pollys        # rebuild from latest git (same as the runner)
-./deploy-cli.sh restart bitforbytes
+./deploy-cli.sh restart bitforbytes  # app services only (never the runner)
 ./deploy-cli.sh logs pollys
 ```
+
+### Auto-deploy runners
+
+Each site can have a GitHub self-hosted runner (`runner-<site>` systemd unit,
+`~/actions-runner-<site>`) that rebuilds on every push. `list`/`status` show its
+state; manage it explicitly:
+
+```bash
+./deploy-cli.sh register-runner pollys   # one-time: register + start (needs GH_TOKEN w/ admin)
+./deploy-cli.sh runner status pollys
+./deploy-cli.sh runner restart bitforbytes
+./deploy-cli.sh runner logs pollys
+```
+
+Adding a new repo later = `add-site <name>` (set `RUNNER_LABEL` in its
+`site.conf` to match the repo's workflow `runs-on`) then `register-runner <name>`.
 
 ## Changing ports / tunnels
 
