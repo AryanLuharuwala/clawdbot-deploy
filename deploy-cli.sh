@@ -123,13 +123,17 @@ cmd_register_runner() {
 }
 
 cmd_secrets() {
-  local sub="$1" name="${2:-}"
-  case "$sub" in
-    gather) secrets_gather "$name";;
-    seal)   secrets_seal "$name";;
-    unseal) secrets_unseal "$name";;
-    *) die "secrets: gather|seal|unseal <site>";;
-  esac
+  local sub="$1" name="${2:-}" targets t
+  [ -n "$name" ] || die "secrets: gather|seal|unseal <site|all>"
+  if [ "$name" = all ]; then targets="$(list_sites)"; else targets="$name"; fi
+  for t in $targets; do
+    case "$sub" in
+      gather) secrets_gather "$t";;
+      seal)   secrets_seal "$t";;     # prompt_pass caches the passphrase across the loop
+      unseal) secrets_unseal "$t";;
+      *) die "secrets: gather|seal|unseal <site|all>";;
+    esac
+  done
 }
 
 cmd_add_site() {
